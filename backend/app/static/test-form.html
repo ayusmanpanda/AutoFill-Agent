@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AutoFill Agent — test form</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+         max-width: 640px; margin: 24px auto; padding: 0 16px; color: #1f2328; background:#fff; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .lead { color:#555; margin-top:0; }
+  fieldset { border:1px solid #d0d7de; border-radius:10px; margin:16px 0; padding:12px 16px; }
+  legend { font-weight:700; padding:0 6px; }
+  .safe legend { color:#0b57d0; }
+  .secret legend { color:#c5221f; }
+  label { display:block; font-weight:600; margin:10px 0 2px; }
+  input, select, textarea { width:100%; padding:8px 9px; font:inherit;
+    border:1px solid #d0d7de; border-radius:6px; background:#fff; }
+  textarea { min-height:70px; }
+  small { color:#656d76; font-weight:400; }
+  /* a field flashes green the moment it receives an input event (i.e. was filled) */
+  .filled { background:#e6f4ea !important; border-color:#137333 !important; }
+  .state { margin-top:4px; font-size:13px; color:#137333; }
+  .warn { color:#b26a00; }
+  button { font:inherit; font-weight:600; padding:9px 14px; border:1px solid #c6dafc;
+    border-radius:6px; background:#e8f0fe; cursor:pointer; margin-top:10px; }
+  pre { white-space:pre-wrap; background:#f6f8fa; border:1px solid #d0d7de;
+    border-radius:6px; padding:10px; }
+  .ok { color:#137333; } .bad { color:#c5221f; }
+</style>
+</head>
+<body>
+  <h1>AutoFill Agent — test form</h1>
+  <p class="lead">A controlled page to verify Phase 6. Fields that get filled flash
+  <span style="color:#137333;font-weight:700">green</span>. The red section must stay
+  <b>empty</b> — that's the privacy guarantee.</p>
+
+  <p class="lead"><b>To test “learn”:</b> leave LinkedIn/GitHub out of your profile, type
+  them here by hand, then click <b>“Learn from page”</b> in the popup. They’re saved to
+  your profile (empty slots only) and will auto-fill next time. Secrets are never learned.</p>
+
+  <form id="testform" onsubmit="return false">
+    <fieldset class="safe">
+      <legend>Should fill (from your profile) — click “Preview autofill”, then “Fill page”</legend>
+
+      <label for="fullname">Full name</label>
+      <input id="fullname" name="fullname" type="text" autocomplete="name" />
+
+      <label for="given">First name</label>
+      <input id="given" name="given" type="text" autocomplete="given-name" />
+
+      <label for="family">Last name</label>
+      <input id="family" name="family" type="text" autocomplete="family-name" />
+
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" />
+
+      <label for="phone">Phone</label>
+      <input id="phone" name="phone" type="tel" autocomplete="tel" />
+
+      <label for="city">City</label>
+      <input id="city" name="city" type="text" autocomplete="address-level2" />
+
+      <label for="country">Country</label>
+      <select id="country" name="country" autocomplete="country-name">
+        <option value="">— select —</option>
+        <option value="India">India</option>
+        <option value="United States">United States</option>
+        <option value="United Kingdom">United Kingdom</option>
+        <option value="Canada">Canada</option>
+        <option value="Germany">Germany</option>
+        <option value="Australia">Australia</option>
+      </select>
+
+      <label for="linkedin">LinkedIn URL</label>
+      <input id="linkedin" name="linkedin" type="url" />
+
+      <label for="github">GitHub URL</label>
+      <input id="github" name="github" type="url" />
+
+      <label for="why">Why do you want to work here?
+        <small>— free-text; fills only after you click “Draft answers” (uses the LLM)</small></label>
+      <textarea id="why" name="why"></textarea>
+    </fieldset>
+
+    <fieldset class="safe">
+      <legend>React-controlled input (the hard case)</legend>
+      <p><small>This input's value is owned by React, so a naive <code>value = …</code>
+      would be ignored. If it fills <b>and</b> the “React state” line below updates,
+      the React-safe setter works. (Needs a “headline” in your profile.)</small></p>
+      <div id="react-root"></div>
+    </fieldset>
+
+    <fieldset class="secret">
+      <legend>Must stay EMPTY — secrets are never filled</legend>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+
+      <label for="otp">One-time passcode (OTP)</label>
+      <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" />
+
+      <label for="cvv">Card security code (CVV)</label>
+      <input id="cvv" name="cvv" type="text" inputmode="numeric" autocomplete="cc-csc" />
+    </fieldset>
+  </form>
+
+  <button type="button" id="show">Show current field values</button>
+  <pre id="dump">Fill the form via the extension, then click the button above.</pre>
+
+  <script>
+    // Flash any field green the instant it receives a real input event.
+    document.addEventListener("input", function (e) {
+      if (e.target && e.target.matches("input, select, textarea")) {
+        e.target.classList.add("filled");
+      }
+    });
+
+    // Dump every field's value so you can confirm secrets are still empty
+    // without opening dev tools.
+    document.getElementById("show").addEventListener("click", function () {
+      var els = document.querySelectorAll("#testform input, #testform select, #testform textarea");
+      var lines = [];
+      var secretEmpty = true;
+      els.forEach(function (el) {
+        var name = el.name || el.id;
+        var v = el.value || "";
+        var isSecret = ["password", "otp", "cvv"].indexOf(name) !== -1;
+        if (isSecret && v !== "") secretEmpty = false;
+        lines.push((isSecret ? "🔒 " : "   ") + name.padEnd(10) + " = " + (v || "(empty)"));
+      });
+      var verdict = secretEmpty
+        ? "\n✅ PASS: every secret field is empty — nothing sensitive was filled."
+        : "\n❌ FAIL: a secret field has a value. Stop and tell Claude.";
+      document.getElementById("dump").textContent = lines.join("\n") + "\n" + verdict;
+      document.getElementById("dump").className = secretEmpty ? "ok" : "bad";
+    });
+  </script>
+
+  <!-- React island: proves the controlled-input fill path. Degrades gracefully offline. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script>
+    (function () {
+      var mount = document.getElementById("react-root");
+      try {
+        if (!window.React || !window.ReactDOM) throw new Error("React CDN did not load");
+        var h = React.createElement;
+        function Controlled() {
+          var s = React.useState("");
+          var val = s[0], setVal = s[1];
+          return h("div", null,
+            h("label", { htmlFor: "headline" }, "Professional headline (React-controlled)"),
+            // value is bound to state -> only a real input event can change it
+            h("input", { id: "headline", name: "headline", type: "text",
+              value: val, onChange: function (e) { setVal(e.target.value); } }),
+            h("div", { className: "state" }, "React state: ",
+              h("b", null, val ? val : "(empty)"))
+          );
+        }
+        ReactDOM.createRoot(mount).render(h(Controlled));
+      } catch (err) {
+        mount.innerHTML = '<p class="warn">React test input could not load (' +
+          err.message + '). The plain fields above still verify the fill.</p>';
+      }
+    })();
+  </script>
+</body>
+</html>

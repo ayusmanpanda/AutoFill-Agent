@@ -1,0 +1,22 @@
+# Python
+backend/.venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets & local data (NEVER commit)
+backend/.env
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# Chroma / local vector store (added in Phase 4)
+backend/.chroma/
+chroma/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

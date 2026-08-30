@@ -1,0 +1,14 @@
+# AutoFill Agent backend — Phase 0 core dependencies
+fastapi>=0.110
+uvicorn[standard]>=0.29
+litellm>=1.40
+pydantic>=2.6
+pydantic-settings>=2.2
+python-dotenv>=1.0
+python-multipart>=0.0.9  # Phase 7  — multipart PDF uploads (/pdf/*)
+pypdf>=4                 # Phase 7  — PDF form filling (pure-Python, no binary deps)
+
+# Added in later phases (uncomment when you reach them):
+# python-docx>=1.1     # Phase 1  — resume import
+# chromadb>=0.5        # Phase 4  — local vector store
+# fastembed>=0.3       # Phase 4  — local embeddings (privacy)

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px system-ui, sans-serif; width: 340px; padding: 12px; margin: 0; }
+      h3 { margin: 0 0 8px; }
+      input, button { width: 100%; box-sizing: border-box; margin: 4px 0; padding: 7px; }
+      button { cursor: pointer; }
+      #scan { font-weight: 600; }
+      #fill { font-weight: 600; background: #e8f0fe; }
+      #draft { font-weight: 600; background: #e6f4ea; }
+      .row { display: flex; gap: 6px; }
+      .row button { margin: 4px 0; }
+      #status { margin: 6px 0; min-height: 1.2em; font-weight: 600; }
+      .ok { color: #137333; }
+      .err { color: #c5221f; }
+      pre { white-space: pre-wrap; word-break: break-word; background: #f5f5f5;
+            padding: 8px; border-radius: 4px; max-height: 240px; overflow: auto; }
+      small { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h3>AutoFill Agent — dev</h3>
+    <small>Paste the LOCAL_TOKEN from <code>backend/.env</code>, then test the connection.</small>
+    <input id="token" type="password" placeholder="LOCAL_TOKEN" />
+    <button id="save">Save token</button>
+    <div class="row">
+      <button id="health">Check backend</button>
+      <button id="llm">Test LLM</button>
+    </div>
+    <button id="scan">Scan this page</button>
+    <button id="fill">Preview autofill</button>
+    <button id="draft">Draft answers</button>
+    <div id="status"></div>
+    <pre id="out"></pre>
+    <script src="popup.js"></script>
+  </body>
+</html>

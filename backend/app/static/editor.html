@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AutoFill Agent — Profile Editor</title>
+<style>
+  :root { color-scheme: light; --bg:#f6f7f9; --card:#fff; --line:#e3e6ea; --ink:#1c2431; --muted:#5b6675; --accent:#2d6cdf; --ok:#187a3f; --err:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { position:sticky; top:0; background:var(--card); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; z-index:5; }
+  header h1 { font-size:17px; margin:0 auto 0 0; }
+  main { max-width:900px; margin:0 auto; padding:20px; }
+  fieldset { background:var(--card); border:1px solid var(--line); border-radius:10px; margin:0 0 18px; padding:16px 18px; }
+  legend { font-weight:600; padding:0 6px; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px 16px; }
+  .full { grid-column:1 / -1; }
+  label { display:block; font-size:12.5px; color:var(--muted); margin-bottom:4px; font-weight:600; letter-spacing:.01em; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; background:#fff; color:var(--ink); }
+  textarea { resize:vertical; min-height:64px; }
+  textarea.json { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; min-height:120px; white-space:pre; }
+  .hint { font-size:12px; color:var(--muted); margin:2px 0 10px; }
+  button { padding:8px 14px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; font:inherit; font-weight:600; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #status { font-size:13px; font-weight:600; margin-left:8px; }
+  #status.ok { color:var(--ok); }
+  #status.err { color:var(--err); }
+  .tokrow { display:flex; gap:8px; align-items:end; }
+  .tokrow > div { flex:1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AutoFill Agent — Profile</h1>
+  <button id="load">Load</button>
+  <button id="save" class="primary">Save</button>
+  <span id="status"></span>
+</header>
+
+<main>
+  <fieldset>
+    <legend>Local token</legend>
+    <div class="tokrow">
+      <div>
+        <label for="token">X-Local-Token (same as LOCAL_TOKEN in backend/.env)</label>
+        <input id="token" type="password" placeholder="paste your local token" autocomplete="off" />
+      </div>
+      <button id="saveToken">Remember</button>
+    </div>
+    <p class="hint">Stored only in this browser. Every request to the backend sends it as the <code>X-Local-Token</code> header.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Basics</legend>
+    <div class="grid">
+      <div><label>Full name</label><input data-path="basics.name" /></div>
+      <div><label>Headline</label><input data-path="basics.headline" placeholder="Backend Engineer" /></div>
+      <div><label>Email</label><input data-path="basics.email" /></div>
+      <div><label>Phone</label><input data-path="basics.phone" /></div>
+      <div><label>Website</label><input data-path="basics.website" /></div>
+      <div><label>Country</label><input data-path="basics.location.country" /></div>
+      <div><label>City</label><input data-path="basics.location.city" /></div>
+      <div><label>Region / State</label><input data-path="basics.location.region" /></div>
+      <div><label>Postal code</label><input data-path="basics.location.postal_code" /></div>
+      <div><label>Address</label><input data-path="basics.location.address" /></div>
+      <div class="full"><label>Summary</label><textarea data-path="basics.summary"></textarea></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Social profiles</legend>
+    <p class="hint">JSON array. Each item: <code>{"network":"LinkedIn","username":"you","url":"https://…"}</code></p>
+    <textarea class="json" data-path="basics.profiles" data-json></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Work experience</legend>
+    <p class="hint">JSON array. Item keys: company, position, location, start_date, end_date, summary, highlights[]</p>
+    <textarea class="json" data-path="work" data-json></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Education</legend>
+    <p class="hint">JSON array. Item keys: institution, area, study_type, start_date, end_date, score, courses[]</p>
+    <textarea class="json" data-path="education" data-json></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Skills</legend>
+    <p class="hint">JSON array. Item keys: name, level, keywords[]</p>
+    <textarea class="json" data-path="skills" data-json></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Projects</legend>
+    <p class="hint">JSON array. Item keys: name, description, url, highlights[]</p>
+    <textarea class="json" data-path="projects" data-json></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Job preferences</legend>
+    <div class="grid">
+      <div><label>Work authorization</label><input data-path="job_preferences.work_authorization" placeholder="Indian citizen" /></div>
+      <div>
+        <label>Requires sponsorship?</label>
+        <select data-path="job_preferences.requires_sponsorship" data-type="bool">
+          <option value="">— not set —</option><option value="true">Yes</option><option value="false">No</option>
+        </select>
+      </div>
+      <div><label>Desired salary</label><input data-path="job_preferences.desired_salary" /></div>
+      <div><label>Salary currency</label><input data-path="job_preferences.salary_currency" placeholder="INR / USD" /></div>
+      <div><label>Notice period</label><input data-path="job_preferences.notice_period" /></div>
+      <div><label>Earliest start date</label><input data-path="job_preferences.earliest_start_date" /></div>
+      <div>
+        <label>Willing to relocate?</label>
+        <select data-path="job_preferences.willing_to_relocate" data-type="bool">
+          <option value="">— not set —</option><option value="true">Yes</option><option value="false">No</option>
+        </select>
+      </div>
+      <div><label>Work mode</label><input data-path="job_preferences.work_mode" placeholder="remote / hybrid / onsite" /></div>
+      <div><label>LinkedIn</label><input data-path="job_preferences.linkedin" /></div>
+      <div><label>GitHub</label><input data-path="job_preferences.github" /></div>
+      <div><label>Portfolio</label><input data-path="job_preferences.portfolio" /></div>
+      <div class="full">
+        <label>Preferred locations (JSON array of strings)</label>
+        <textarea class="json" data-path="job_preferences.preferred_locations" data-json></textarea>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Voluntary disclosures (optional)</legend>
+    <p class="hint">Entirely optional EEO fields. Leave blank if you prefer not to say — nothing here is required.</p>
+    <div class="grid">
+      <div><label>Gender</label><input data-path="voluntary.gender" /></div>
+      <div><label>Race / ethnicity</label><input data-path="voluntary.race_ethnicity" /></div>
+      <div><label>Hispanic / Latino</label><input data-path="voluntary.hispanic_latino" /></div>
+      <div><label>Veteran status</label><input data-path="voluntary.veteran_status" /></div>
+      <div><label>Disability status</label><input data-path="voluntary.disability_status" /></div>
+    </div>
+  </fieldset>
+</main>
+
+<script src="/static/editor.js"></script>
+</body>
+</html>

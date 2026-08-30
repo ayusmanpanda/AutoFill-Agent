@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AutoFill Agent — fill a PDF</title>
+<style>
+  :root { color-scheme: light; --line:#d0d7de; --blue:#0b57d0; --red:#c5221f; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+         max-width: 720px; margin: 24px auto; padding: 0 16px; color:#1f2328; background:#fff; }
+  h1 { font-size: 20px; margin-bottom: 2px; }
+  .lead { color:#555; margin-top:0; }
+  fieldset { border:1px solid var(--line); border-radius:10px; margin:16px 0; padding:12px 16px; }
+  legend { font-weight:700; padding:0 6px; }
+  label { display:block; font-weight:600; margin:8px 0 2px; }
+  input[type=password], input[type=file] { width:100%; padding:8px 9px; font:inherit;
+    border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { font:inherit; font-weight:600; padding:9px 14px; border:1px solid #c6dafc;
+    border-radius:6px; background:#e8f0fe; color:#0b57d0; cursor:pointer; margin:10px 6px 0 0; }
+  button.primary { background:#0b57d0; color:#fff; border-color:#0b57d0; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  small { color:#656d76; font-weight:400; }
+  table { border-collapse:collapse; width:100%; margin-top:10px; font-size:14px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #eaecef; vertical-align:top; }
+  th { color:#656d76; font-weight:600; }
+  .tag { display:inline-block; font-size:12px; font-weight:700; padding:1px 7px; border-radius:20px; }
+  .fill { background:#e6f4ea; color:#137333; }
+  .manual { background:#fce8e6; color:#c5221f; }
+  .generate { background:#fef7e0; color:#b26a00; }
+  .unmapped { background:#f1f3f4; color:#5f6368; }
+  .status { margin-top:10px; font-size:14px; }
+  .status.err { color:#c5221f; }
+  .status.ok { color:#137333; }
+  code { background:#f6f8fa; padding:1px 4px; border-radius:4px; }
+</style>
+</head>
+<body>
+  <h1>Fill a PDF form</h1>
+  <p class="lead">Pick a PDF application form, review what will be filled, then download the
+  filled copy. <b>Secrets (SSN, card, CVV, PIN, bank) are never filled</b> — leave those for
+  yourself. Nothing is submitted anywhere; you get a file back to check and save.</p>
+
+  <fieldset>
+    <legend>Local token</legend>
+    <label for="token">X-Local-Token <small>(same as LOCAL_TOKEN in backend/.env)</small></label>
+    <input id="token" type="password" placeholder="paste your local token" autocomplete="off" />
+    <button id="saveToken">Remember</button>
+    <small class="lead">Stored only in this browser; sent as the <code>X-Local-Token</code> header.</small>
+  </fieldset>
+
+  <fieldset>
+    <legend>PDF</legend>
+    <label for="file">Choose a PDF form</label>
+    <input id="file" type="file" accept="application/pdf,.pdf" />
+    <div>
+      <button id="planBtn" class="primary" disabled>Review plan</button>
+      <button id="fillBtn" disabled>Fill &amp; download</button>
+      <label style="display:inline-block; font-weight:400; margin-top:12px;">
+        <input type="checkbox" id="useLlm" style="width:auto;" /> use LLM for tricky fields (else local-only)
+      </label>
+    </div>
+    <div id="status" class="status"></div>
+  </fieldset>
+
+  <div id="planWrap" style="display:none;">
+    <fieldset>
+      <legend>Fill plan <small>— review before filling</small></legend>
+      <div id="planSummary" class="lead"></div>
+      <table id="planTable"><thead><tr><th>Field</th><th>Action</th><th>Value</th></tr></thead>
+        <tbody></tbody></table>
+    </fieldset>
+  </div>
+
+<script>
+  const TOKEN_KEY = "localToken";  // shared with the profile editor
+  const $ = (id) => document.getElementById(id);
+  const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
+  const say = (msg, ok) => {
+    const el = $("status");
+    el.textContent = msg;
+    el.className = "status " + (ok === false ? "err" : ok === true ? "ok" : "");
+  };
+  const esc = (s) => (s == null ? "" : String(s));
+  const trunc = (s, n) => (esc(s).length > n ? esc(s).slice(0, n - 1) + "…" : esc(s));
+
+  function fileForm() {
+    const f = $("file").files[0];
+    if (!f) { say("Choose a PDF first.", false); return null; }
+    const fd = new FormData();
+    fd.append("file", f, f.name);
+    return fd;
+  }
+
+  async function onPlan() {
+    const fd = fileForm();
+    if (!fd) return;
+    say("Reading the PDF and building a plan…");
+    try {
+      const r = await fetch("/pdf/plan?use_llm=" + ($("useLlm").checked ? "true" : "false"), {
+        method: "POST", headers: { "X-Local-Token": getToken() }, body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+      renderPlan(await r.json());
+      say("Reviewed. If it looks right, click “Fill & download”.", true);
+    } catch (e) { say("Plan failed: " + e.message, false); }
+  }
+
+  function renderPlan(plan) {
+    const s = plan.summary || {};
+    $("planSummary").textContent =
+      `${s.fill || 0} to fill · ${s.manual_entry || 0} manual (secrets) · ` +
+      `${s.generate || 0} free-text · ${s.unmapped || 0} unmapped`;
+    const body = $("planTable").querySelector("tbody");
+    body.innerHTML = "";
+    (plan.fields || []).forEach((f) => {
+      const tr = document.createElement("tr");
+      const act = f.action;
+      const cls = act === "fill" ? "fill" : act === "manual_entry" ? "manual"
+        : act === "generate" ? "generate" : "unmapped";
+      const label = act === "manual_entry" ? "manual" : act;
+      const val = act === "fill" ? trunc(f.value, 60)
+        : act === "manual_entry" ? "— you enter this —"
+        : act === "generate" ? "(needs a written answer)" : "";
+      tr.innerHTML = `<td>${esc(f.label || f.field_id)}</td>` +
+        `<td><span class="tag ${cls}">${label}</span></td>` +
+        `<td>${val}</td>`;
+      body.appendChild(tr);
+    });
+    $("planWrap").style.display = "block";
+  }
+
+  async function onFill() {
+    const fd = fileForm();
+    if (!fd) return;
+    say("Filling the PDF…");
+    try {
+      const r = await fetch("/pdf/fill?use_llm=" + ($("useLlm").checked ? "true" : "false"), {
+        method: "POST", headers: { "X-Local-Token": getToken() }, body: fd,
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
+      const filled = r.headers.get("X-Autofill-Filled") || "?";
+      const blob = await r.blob();
+      const name = ($("file").files[0].name || "form.pdf").replace(/\.pdf$/i, "") + ".filled.pdf";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+      say(`Filled ${filled} field(s). Downloaded “${name}”. Review it, enter any secrets by hand, then submit yourself.`, true);
+    } catch (e) { say("Fill failed: " + e.message, false); }
+  }
+
+  function refreshButtons() {
+    const ready = !!$("file").files.length && !!getToken();
+    $("planBtn").disabled = !ready;
+    $("fillBtn").disabled = !ready;
+  }
+
+  $("token").value = getToken();
+  $("saveToken").addEventListener("click", () => {
+    localStorage.setItem(TOKEN_KEY, $("token").value.trim());
+    say("Token saved.", true);
+    refreshButtons();
+  });
+  $("file").addEventListener("change", () => { $("planWrap").style.display = "none"; refreshButtons(); });
+  $("planBtn").addEventListener("click", onPlan);
+  $("fillBtn").addEventListener("click", onFill);
+  refreshButtons();
+</script>
+</body>
+</html>
